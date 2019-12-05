@@ -7,8 +7,8 @@ import util.StringUtil;
 import view.processManagement.ProcessManagementController;
 import view.processManagement.ProcessManagementWindow;
 
-import java.io.*;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -18,7 +18,7 @@ public class CPU {
     //申请使用设备时休眠时间
     public static int IO_BLOCK_TIME = 6000;
     //一条指令执行后休眠的时间（显示中间结果）
-    public static int SLEEP_TIME_FOR_EACH_INSTRUCTMENT = 2000;
+    public static int SLEEP_TIME_FOR_EACH_INSTRUCTMENT = 1000;
 
     //系统时间
     private static int systemTime = 0;
@@ -30,8 +30,9 @@ public class CPU {
     //线程池
     private static ExecutorService cachedThreadPool = Executors.newCachedThreadPool();
 
+    private static CPU cpu = new CPU();
+
     private CPU() {
-        run();
     }
 
     // cpu执行进程调度
@@ -42,27 +43,24 @@ public class CPU {
                 while (true) {
                     PCB pcb = getReadyProcessPCB();
                     if (pcb == null) {
-                        System.out.println("就绪队列为空");
+                        ++systemTime;
+                        showData(null);
                         try {
-                            showData(null);
-                            Thread.sleep(1000);
+                            Thread.sleep(SLEEP_TIME_FOR_EACH_INSTRUCTMENT);
                         } catch (InterruptedException e) {
                             e.printStackTrace();
                         }
                     } else {
                         psw.initPSW();
-                        while (!psw.isProcessEnd() && !psw.isIOInterrupt() && !psw.isTimeSliceUsedUp()) {
-                            try {
-                                Thread.sleep(SLEEP_TIME_FOR_EACH_INSTRUCTMENT);
-                            } catch (InterruptedException e) {
-                                e.printStackTrace();
-                            }
+                        while (!psw.isProcessEnd() && !psw.isIOInterrupt() && !psw.isTimeSliceUsedUp() && pcb.getProcessID() != null) {
                             //取指令并将指令指针 +1
                             String currentInstruction = pcb.getCurrentInstruction();
                             pcb.increaseCurrentInstructionIndex();
 
-                            //执行并保存中间结果
-                            executeInstruction(currentInstruction, pcb);
+                            if (currentInstruction != null) {
+                                //执行并保存中间结果
+                                executeInstruction(currentInstruction, pcb);
+                            }
 
                             //剩余时间片减一，修改PSW
                             pcb.decreaseRestTime();
@@ -72,7 +70,11 @@ public class CPU {
                             showData(pcb);
                             //检测并处理异常
                             handleInterrupt(pcb);
-                            System.out.println(pcb);
+                            try {
+                                Thread.sleep(SLEEP_TIME_FOR_EACH_INSTRUCTMENT);
+                            } catch (InterruptedException e) {
+                                e.printStackTrace();
+                            }
                         }
                     }
                 }
@@ -82,13 +84,15 @@ public class CPU {
             private PCB getReadyProcessPCB() {
                 List<PCB> readyProcessPCBList = PCB.getReadyProcessPCBList();
                 PCB pcb = null;
-                if (!readyProcessPCBList.isEmpty()) {
-                    pcb = readyProcessPCBList.get(0);
-                    readyProcessPCBList.remove(0);
+                synchronized (readyProcessPCBList) {
+                    if (!readyProcessPCBList.isEmpty()) {
+                        pcb = readyProcessPCBList.get(0);
+                        readyProcessPCBList.remove(0);
 
-                    pcb.setProcessState(PCB.EXECUTING);
-                    pcb.resetRestTime();
-                    reg = pcb.readRegister();
+                        pcb.setProcessState(PCB.EXECUTING);
+                        pcb.resetRestTime();
+                        reg = pcb.readRegister();
+                    }
                 }
                 return pcb;
             }
@@ -186,19 +190,40 @@ public class CPU {
     private void showData(PCB pcb) {
         ProcessManagementController controller = ProcessManagementWindow.getController();
         if (controller != null) {
-            Platform.runLater(new Runnable() {
-                                  @Override
-                                  public void run() {
-                                      controller.updateData(pcb.getProcessID() == null? null : pcb);
-                                  }
-                              }
+            final CountDownLatch doneLatch = new CountDownLatch(1);
+            Platform.runLater(() -> {
+                try {
+                    if (pcb != null) {
+                        synchronized (pcb) {
+                            if (pcb != null && pcb.getProcessID() != null) {
+                                controller.updateData(pcb);
+                            } else {
+                                controller.updateData(null);
+                            }
+                        }
+                    }else {
+                        controller.updateData(null);
+                    }
+                } finally {
+                    doneLatch.countDown();
+                }
+                    }
             );
+            try {
+                doneLatch.await();
+            } catch (InterruptedException e) {
+                // ignore exception
+            }
         }
     }
 
     //关机
-    public static void shutdown(){
+    public static void shutdown() {
         cachedThreadPool.shutdownNow();
+    }
+
+    public static void work() {
+        cpu.run();
     }
 
 

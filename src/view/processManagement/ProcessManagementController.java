@@ -8,7 +8,7 @@ import javafx.scene.control.ListView;
 import model.processManege.CPU;
 import model.processManege.PCB;
 
-public class  ProcessManagementController {
+public class ProcessManagementController {
     @FXML
     private Label systemTime;
 
@@ -44,18 +44,28 @@ public class  ProcessManagementController {
 
     /**
      * 更新界面数据
+     *
      * @param pcb
      */
     public void updateData(PCB pcb) {
         systemTime.setText(CPU.getSystemTime() + "");
+        readyList.clear();
+        for (PCB readyPCB : PCB.getReadyProcessPCBList()) {
+            if (readyPCB.getProcessID() != null)
+                readyList.add("进程ID:"+readyPCB.getProcessID().toString());
+        }
+
+        blockingList.clear();
+        for (PCB blockingPCB : PCB.getBlockedProcessPCBList()) {
+            if (blockingPCB.getProcessID() != null)
+                blockingList.add("进程ID:"+blockingPCB.getProcessID().toString() + "；已经等待：" + blockingPCB.getBlockedTime());
+        }
 
         if (pcb == null) {
             implementingCommand.setText("");
             implementResolve.setText("");
             processId.setText("无进程");
             remainTimePart.setText("");
-            readyList.clear();
-            blockingList.clear();
             return;
         }
 
@@ -66,16 +76,6 @@ public class  ProcessManagementController {
         processId.setText(pcb.getProcessID().toString());
 
         remainTimePart.setText(pcb.getRestTime() + "");
-
-        readyList.clear();
-        for (PCB readyPCB : PCB.getReadyProcessPCBList()) {
-            readyList.add(readyPCB.getProcessID().toString());
-        }
-
-        blockingList.clear();
-        for (PCB blockingPCB : PCB.getBlockedProcessPCBList()) {
-            blockingList.add(blockingPCB.getProcessID().toString() + "；还需等待：" );
-        }
     }
 
 }

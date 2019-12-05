@@ -83,9 +83,8 @@ public class PCB {
 
     public void increaseCurrentInstructionIndex(){
         currentInstructionIndex++;
-        if(currentInstructionIndex == processInstructions.size())
+        if(processInstructions == null || currentInstructionIndex >= processInstructions.size())
             this.processState = END;
-
     }
 
     // getter & setter
@@ -129,7 +128,7 @@ public class PCB {
         this.processBlockReason = processBlockReason;
     }
     public String getCurrentInstruction(){
-        return processInstructions.get(currentInstructionIndex);
+        return processInstructions == null || processInstructions.size() <= currentInstructionIndex ? null: processInstructions.get(currentInstructionIndex);
     }
 
     public void setIntermediateResult(String intermediateResult) {
@@ -169,12 +168,9 @@ public class PCB {
     @Override
     public String toString() {
         return "PCB{" +
-                "register=" + Arrays.toString(registers) +
-                ", processID='" + processID + '\'' +
-                ", restTime=" + restTime +
+                "pcbId=" + pcbId +
                 ", processState=" + processState +
-                ", processBlockReason=" + processBlockReason +
-                ", currentInstructionIndex=" + currentInstructionIndex +
+                ", processBlockTime=" + processBlockTime +
                 ", intermediateResult='" + intermediateResult + '\'' +
                 '}';
     }
