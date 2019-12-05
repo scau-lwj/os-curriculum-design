@@ -13,7 +13,7 @@ import javafx.stage.WindowEvent;
 public class MemoryManagementWindow extends Application {
     private static MemoryManagementWindow instance;    // 单例模式
 
-    private static MemoryManagementController controller = null;   // 界面controller
+    private static view.memoryManagement.MemoryManagementController controller = null;   // 界面controller
 
     private Stage primaryStage;           // 窗口 Stage 对象
 
